@@ -1,0 +1,22 @@
+[package]
+name = "bevy_blender"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+blend = "0.6.1"
+bevy = { git = "https://github.com/bevyengine/bevy", branch = "main"}
+bevy_app = { git = "https://github.com/bevyengine/bevy", branch = "main"}
+bevy_asset = { git = "https://github.com/bevyengine/bevy", branch = "main"}
+bevy_render = { git = "https://github.com/bevyengine/bevy", branch = "main"}
+bevy_utils = { git = "https://github.com/bevyengine/bevy", branch = "main"}
+anyhow = "1.0"
+thiserror = "1.0"
+
+[dev-dependencies]
+
+
+[features]
+default = []
