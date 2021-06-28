@@ -1,7 +1,5 @@
 # bevy_blender
 
-## bevy_blender
-
 [![Crate version](https://img.shields.io/crates/v/bevy_blender?style=flat-square)](https://crates.io/crates/bevy_blender/)
 ![Crate license](https://img.shields.io/crates/l/bevy_blender?style=flat-square)
 
@@ -62,5 +60,4 @@ Currently, bevy_blend can only load mesh data from a .blend file. I plan to exte
 * Only non-compressed .blend files work. Though Blender uses the standard zlib compression (I think), so it should be easy enough to detect a compressed .blend file and uncompress it.
 * Only the named mesh is constructed, children meshes have to be manually constructed and placed relative to the parent mesh. See the above aspiration section.
 * Blender modifiers are not applied before constructing the mesh.
-
-License: MIT
+* The .blend file is read, and all meshes are parsed, for each call to asset_server.load(). Ideally we would parse the .blend file once and just make all of the meshes available. Still trying to find the best way to accomplish this.

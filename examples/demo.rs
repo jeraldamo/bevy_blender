@@ -14,6 +14,8 @@ fn main() {
 }
 
 fn setup(mut commands: Commands, asset_server: ResMut<AssetServer>, mut materials: ResMut<Assets<StandardMaterial>>) {
+
+
     commands.spawn_bundle(PbrBundle {
         mesh: asset_server.load(blender_mesh!("demo.blend", "Cube")),
         material: materials.add(Color::rgb(0.9, 0.4, 0.3).into()),
@@ -35,7 +37,7 @@ fn setup(mut commands: Commands, asset_server: ResMut<AssetServer>, mut material
         ..Default::default()
     });
 
-    commands.spawn_bundle(PointLightBundle{
+    commands.spawn_bundle(LightBundle{
         transform: Transform::from_translation(Vec3::new(4.0, 8.0, 4.0)),
         ..Default::default()
     });

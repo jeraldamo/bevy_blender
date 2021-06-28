@@ -106,8 +106,8 @@ async fn load_blend_assets <'a, 'b>(
     load_context: &'a mut LoadContext<'b>,
     ) -> anyhow::Result<()> {
         // Check to make sure that the blender file has the magic number
-        //                    B     L     E     N     D     E     R
-        if &bytes[0..7] != &[0x42, 0x4c, 0x45, 0x4e, 0x44, 0x45, 0x52] {
+        //                  B     L     E     N     D     E     R
+        if bytes[0..7] != [0x42, 0x4c, 0x45, 0x4e, 0x44, 0x45, 0x52] {
             return Err(anyhow::Error::new(
                 BevyBlenderError::InvalidBlendFile{
                     file_name: String::from(load_context.path().to_str().unwrap()),
@@ -192,7 +192,7 @@ fn instance_to_mesh(instance: Instance) -> anyhow::Result<Mesh> {
                 indices.push(faceloop[0]); indices.push(faceloop[3]);
             },
             _ => {
-                eprintln!("Warning: bevy_blend trying to create {}-gon. This is not currently supported.", faceloop.len());
+                eprintln!("Warning: bevy_blend trying to create {}-gon on mesh {}. This is not currently supported.", faceloop.len(), instance.get("id").get_string("name"));
             }
         }
     }
