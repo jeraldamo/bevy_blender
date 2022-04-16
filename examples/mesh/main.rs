@@ -8,8 +8,8 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugin(BlenderPlugin)
-        .add_startup_system(setup.system())
-        .add_system(camera::pan_orbit_camera.system())
+        .add_startup_system(setup)
+        .add_system(camera::pan_orbit_camera)
         .run();
 }
 
