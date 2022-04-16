@@ -32,15 +32,14 @@
 //!
 //! A full example can be found in `examples/demo.rs`. Simply run `cargo run --example demo` to execute it. This will open a .blend file located at `assets/demo.blend`.
 
-
-use blend::{Blend, runtime::Instance};
 use bevy_app::prelude::*;
 use bevy_asset::{AddAsset, AssetLoader, LoadContext, LoadedAsset};
 use bevy_render::{
     mesh::{Indices, Mesh},
-    pipeline::PrimitiveTopology,
+    render_resource::PrimitiveTopology,
 };
 use bevy_utils::BoxedFuture;
+use blend::{runtime::Instance, Blend};
 
 /// Takes a .blend file location and a mesh name and generates
 /// an appropriate asset_loader string. For example,
@@ -49,14 +48,14 @@ use bevy_utils::BoxedFuture;
 macro_rules! blender_mesh {
     ($blend_file:literal, $mesh_name:literal) => {
         format!("{}#ME{}", $blend_file, $mesh_name).as_str()
-    }
+    };
 }
 
 /// Plugin for Bevy that allows for interaction with .blend files
 pub struct BlenderPlugin;
 
 impl Plugin for BlenderPlugin {
-    fn build(&self, app: &mut AppBuilder) {
+    fn build(&self, app: &mut App) {
         app.init_asset_loader::<BlenderLoader>();
     }
 }
@@ -64,7 +63,6 @@ impl Plugin for BlenderPlugin {
 /// bevy_blender errors
 #[derive(thiserror::Error, Debug)]
 pub enum BevyBlenderError {
-
     /// The library tried to parse the .blend file, but could not find the magic number. Probably a corrupted or compressed .blend file.
     #[error("Invalid .blend file {file_name:?}, missing magic number")]
     InvalidBlendFile {
@@ -79,14 +77,13 @@ pub enum BevyBlenderError {
         expected: String,
         /// The type that was found
         found: String,
-    }
+    },
 }
 
 #[derive(Default)]
 struct BlenderLoader;
 
 impl AssetLoader for BlenderLoader {
-
     fn load<'a>(
         &'a self,
         bytes: &'a [u8],
@@ -101,49 +98,47 @@ impl AssetLoader for BlenderLoader {
     }
 }
 
-async fn load_blend_assets <'a, 'b>(
+async fn load_blend_assets<'a, 'b>(
     bytes: &'a [u8],
     load_context: &'a mut LoadContext<'b>,
-    ) -> anyhow::Result<()> {
-        // Check to make sure that the blender file has the magic number
-        //                  B     L     E     N     D     E     R
-        if bytes[0..7] != [0x42, 0x4c, 0x45, 0x4e, 0x44, 0x45, 0x52] {
-            return Err(anyhow::Error::new(
-                BevyBlenderError::InvalidBlendFile{
-                    file_name: String::from(load_context.path().to_str().unwrap()),
-                }));
+) -> anyhow::Result<()> {
+    // Check to make sure that the blender file has the magic number
+    //                  B     L     E     N     D     E     R
+    if bytes[0..7] != [0x42, 0x4c, 0x45, 0x4e, 0x44, 0x45, 0x52] {
+        return Err(anyhow::Error::new(BevyBlenderError::InvalidBlendFile {
+            file_name: String::from(load_context.path().to_str().unwrap()),
+        }));
+    }
+
+    // TODO: check for compressed blend file and decompress if necessary
+    let blend = Blend::new(bytes);
+
+    // Load mesh assets
+    for mesh in blend.get_by_code(*b"ME") {
+        // Get the name of the mesh and remove the prepending "ME"
+        let label = mesh.get("id").get_string("name");
+
+        // Skip any mesh whose name starts with underscore
+        if !label.starts_with("ME_") {
+            // Add the created mesh with the proper label
+            load_context
+                .set_labeled_asset(label.as_str(), LoadedAsset::new(instance_to_mesh(mesh)?));
         }
+    }
 
-        // TODO: check for compressed blend file and decompress if necessary
-        let blend = Blend::new(bytes);
+    // TODO: load other kinds of assets
 
-        // Load mesh assets
-        for mesh in blend.get_by_code(*b"ME") {
-            // Get the name of the mesh and remove the prepending "ME"
-            let label = mesh.get("id").get_string("name");
-
-            // Skip any mesh whose name starts with underscore
-            if !label.starts_with("ME_") {
-                // Add the created mesh with the proper label
-                load_context.set_labeled_asset(label.as_str(), LoadedAsset::new(instance_to_mesh(mesh)?));
-            }
-        }
-
-        // TODO: load other kinds of assets
-
-        Ok(())
+    Ok(())
 }
 
 /// Takes a Blend::Instance mesh and converts it to a Bevy mesh
 fn instance_to_mesh(instance: Instance) -> anyhow::Result<Mesh> {
-
     // Don't process instances of types other than mesh
     if instance.type_name != "Mesh" {
-        return Err(anyhow::Error::new(
-            BevyBlenderError::InvalidInstanceType{
-                expected: String::from("Mesh"),
-                found: instance.type_name,
-            }));
+        return Err(anyhow::Error::new(BevyBlenderError::InvalidInstanceType {
+            expected: String::from("Mesh"),
+            found: instance.type_name,
+        }));
     }
 
     // Takes a normalized i16 vector from instance, and converts it to a normalized f32 vector
@@ -161,7 +156,6 @@ fn instance_to_mesh(instance: Instance) -> anyhow::Result<Mesh> {
     let blender_uvs = instance.get_iter("mloopuv").collect::<Vec<_>>();
     let blender_verts = instance.get_iter("mvert").collect::<Vec<_>>();
 
-
     // Create empty index list
     let mut indices: Vec<u32> = Vec::new();
 
@@ -174,23 +168,31 @@ fn instance_to_mesh(instance: Instance) -> anyhow::Result<Mesh> {
             faceloop.push(blender_loops[i as usize].get_i32("v") as u32);
         }
 
-
         // TODO: Implement triangulation algorithm to handle ngon face
         match faceloop.len() {
             3 => {
-                indices.push(faceloop[1]); indices.push(faceloop[0]);
-                indices.push(faceloop[2]); indices.push(faceloop[1]);
-                indices.push(faceloop[0]); indices.push(faceloop[2]);
-            },
+                indices.push(faceloop[1]);
+                indices.push(faceloop[0]);
+                indices.push(faceloop[2]);
+                indices.push(faceloop[1]);
+                indices.push(faceloop[0]);
+                indices.push(faceloop[2]);
+            }
             4 => {
-                indices.push(faceloop[1]); indices.push(faceloop[0]);
-                indices.push(faceloop[2]); indices.push(faceloop[1]);
-                indices.push(faceloop[0]); indices.push(faceloop[2]);
+                indices.push(faceloop[1]);
+                indices.push(faceloop[0]);
+                indices.push(faceloop[2]);
+                indices.push(faceloop[1]);
+                indices.push(faceloop[0]);
+                indices.push(faceloop[2]);
 
-                indices.push(faceloop[2]); indices.push(faceloop[0]);
-                indices.push(faceloop[3]); indices.push(faceloop[2]);
-                indices.push(faceloop[0]); indices.push(faceloop[3]);
-            },
+                indices.push(faceloop[2]);
+                indices.push(faceloop[0]);
+                indices.push(faceloop[3]);
+                indices.push(faceloop[2]);
+                indices.push(faceloop[0]);
+                indices.push(faceloop[3]);
+            }
             _ => {
                 eprintln!("Warning: bevy_blend trying to create {}-gon on mesh {}. This is not currently supported.", faceloop.len(), instance.get("id").get_string("name"));
             }
@@ -198,9 +200,9 @@ fn instance_to_mesh(instance: Instance) -> anyhow::Result<Mesh> {
     }
 
     // Create vectors for mesh attributes
-    let mut positions: Vec<[f32;3]> = Vec::new();
-    let mut normals: Vec<[f32;3]> = Vec::new();
-    let mut uvs: Vec<[f32;2]> = vec![[0.0, 0.0]; blender_verts.len()];
+    let mut positions: Vec<[f32; 3]> = Vec::new();
+    let mut normals: Vec<[f32; 3]> = Vec::new();
+    let mut uvs: Vec<[f32; 2]> = vec![[0.0, 0.0]; blender_verts.len()];
 
     // Fill position and normal attributes from blender_verts, swapping Y and Z
     for vert in blender_verts {
@@ -220,20 +222,10 @@ fn instance_to_mesh(instance: Instance) -> anyhow::Result<Mesh> {
     // Create Bevy mesh
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
     mesh.set_indices(Some(Indices::U32(indices)));
-    mesh.set_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-    mesh.set_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-    mesh.set_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
 
     // Return Bevy mesh
     Ok(mesh)
 }
-
-
-
-
-
-
-
-
-
-
