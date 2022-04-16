@@ -37,6 +37,7 @@ use bevy_asset::{AddAsset, AssetLoader, LoadContext, LoadedAsset};
 use bevy_utils::BoxedFuture;
 use blend::Blend;
 
+mod material;
 mod mesh;
 
 /// Plugin for Bevy that allows for interaction with .blend files
@@ -65,6 +66,13 @@ pub enum BevyBlenderError {
         expected: String,
         /// The type that was found
         found: String,
+    },
+
+    /// The library tried to load a Blender asset that is not yet supported.
+    #[error("Unsupported asset: {asset_type:?}.")]
+    UnsupportedAsset {
+        /// The type of asset trying to be loaded
+        asset_type: String,
     },
 }
 
@@ -112,6 +120,21 @@ async fn load_blend_assets<'a, 'b>(
             load_context.set_labeled_asset(
                 label.as_str(),
                 LoadedAsset::new(mesh::instance_to_mesh(mesh)?),
+            );
+        }
+    }
+
+    // Load material assets
+    for material in blend.get_by_code(*b"MA") {
+        // Get the name of the material
+        let label = material.get("id").get_string("name");
+
+        // Skip any material whose name starts with underscore
+        if !label.starts_with("MA_") {
+            // Add the created material with the proper label
+            load_context.set_labeled_asset(
+                label.as_str(),
+                LoadedAsset::new(material::instance_to_material(material)?),
             );
         }
     }
