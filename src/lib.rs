@@ -106,6 +106,8 @@ async fn load_blend_assets<'a, 'b>(
         }));
     }
 
+    let blend_version = (bytes[9] - 48, bytes[10] - 48, bytes[11] - 48);
+
     // TODO: check for compressed blend file and decompress if necessary
     let blend = Blend::new(bytes);
 
@@ -119,7 +121,7 @@ async fn load_blend_assets<'a, 'b>(
             // Add the created mesh with the proper label
             load_context.set_labeled_asset(
                 label.as_str(),
-                LoadedAsset::new(mesh::instance_to_mesh(mesh)?),
+                LoadedAsset::new(mesh::instance_to_mesh(mesh, blend_version)?),
             );
         }
     }
@@ -134,7 +136,7 @@ async fn load_blend_assets<'a, 'b>(
             // Add the created material with the proper label
             load_context.set_labeled_asset(
                 label.as_str(),
-                LoadedAsset::new(material::instance_to_material(material)?),
+                LoadedAsset::new(material::instance_to_material(material, blend_version)?),
             );
         }
     }

@@ -1,3 +1,4 @@
+use bevy_math::Vec3;
 use bevy_render::{
     mesh::{Indices, Mesh},
     render_resource::PrimitiveTopology,
@@ -17,7 +18,10 @@ macro_rules! blender_mesh {
 }
 
 /// Takes a Blend::Instance mesh and converts it to a Bevy mesh
-pub(crate) fn instance_to_mesh(instance: Instance) -> anyhow::Result<Mesh> {
+pub(crate) fn instance_to_mesh(
+    instance: Instance,
+    blend_version: (u8, u8, u8),
+) -> anyhow::Result<Mesh> {
     // Don't process instances of types other than mesh
     if instance.type_name != "Mesh" {
         return Err(anyhow::Error::new(BevyBlenderError::InvalidInstanceType {
@@ -45,7 +49,7 @@ pub(crate) fn instance_to_mesh(instance: Instance) -> anyhow::Result<Mesh> {
     let mut indices: Vec<u32> = Vec::new();
 
     // Loop over blender faces and appropriately fill indices
-    for blender_face in blender_faces {
+    for blender_face in &blender_faces {
         let start = blender_face.get_i32("loopstart");
         let end = start + blender_face.get_i32("totloop");
         let mut faceloop: Vec<u32> = Vec::new();
@@ -102,12 +106,24 @@ pub(crate) fn instance_to_mesh(instance: Instance) -> anyhow::Result<Mesh> {
     let mut uvs: Vec<[f32; 2]> = vec![[0.0, 0.0]; blender_verts.len()];
 
     // Fill position and normal attributes from blender_verts, swapping Y and Z
-    for vert in blender_verts {
+    for vert in &blender_verts {
         let p = vert.get_f32_vec("co");
         positions.push([p[0], p[2], -p[1]]);
+    }
 
-        let n = no_to_f32(vert.get_i16_vec("no"));
-        normals.push([n[0], n[2], -n[1]]);
+    match blend_version {
+        (0..=2, _, _) => {
+            for vert in &blender_verts {
+                let n = no_to_f32(vert.get_i16_vec("no"));
+                normals.push([n[0], n[2], -n[1]]);
+            }
+        }
+        (3.., _, _) => {
+            // for vert in &blender_verts {
+            //     normals.push([0.0, 0.0, 1.0]);
+            // }
+            normals = calculate_vertex_normals(&blender_faces, &blender_loops, &positions);
+        }
     }
 
     // Get UVs from loops indices
@@ -125,4 +141,48 @@ pub(crate) fn instance_to_mesh(instance: Instance) -> anyhow::Result<Mesh> {
 
     // Return Bevy mesh
     Ok(mesh)
+}
+
+// Blender version 3+ does not include precalculated vertex normals in the .blend file
+fn calculate_vertex_normals(
+    blender_faces: &Vec<Instance>,
+    blender_loops: &Vec<Instance>,
+    positions: &Vec<[f32; 3]>,
+) -> Vec<[f32; 3]> {
+    let mut normals: Vec<Vec3> = Vec::new();
+
+    for blender_face in blender_faces {
+        let start = blender_face.get_i32("loopstart");
+        let end = start + blender_face.get_i32("totloop");
+        let mut faceloop: Vec<u32> = Vec::new();
+        for i in start..end {
+            faceloop.push(blender_loops[i as usize].get_i32("v") as u32);
+        }
+        // Calculate face normal as cross product of first and last edge in loop
+        let v1 = positions[faceloop[0] as usize];
+        let v2 = positions[faceloop[1] as usize];
+        let v3 = positions[faceloop[faceloop.len() - 1] as usize];
+
+        let e1 = Vec3::new(v2[0] - v1[0], v2[1] - v1[1], v2[2] - v1[2]);
+        let e2 = Vec3::new(v1[0] - v3[0], v1[1] - v3[1], v1[2] - v3[2]);
+
+        let n = e2.cross(e1).normalize();
+
+        for vertex in faceloop {
+            // Make sure vertex index exists in normals
+            while vertex >= normals.len() as u32 {
+                normals.push(Vec3::new(0.0, 0.0, 0.0));
+            }
+            // Add face normal to vertex index
+            normals[vertex as usize] += n;
+        }
+    }
+
+    let mut normals_out: Vec<[f32; 3]> = Vec::new();
+    // Normalize vertex normals and cast to proper type
+    for normal in normals {
+        normals_out.push(normal.normalize().into());
+    }
+
+    return normals_out;
 }
