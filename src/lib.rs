@@ -34,11 +34,15 @@
 
 use bevy_app::prelude::*;
 use bevy_asset::{AddAsset, AssetLoader, LoadContext, LoadedAsset};
+use bevy_math::{Mat4, Vec3};
 use bevy_utils::BoxedFuture;
 use blend::Blend;
 
 mod material;
 mod mesh;
+mod object;
+
+pub use object::{spawn_blender_object, BlenderObjectBundle};
 
 /// Plugin for Bevy that allows for interaction with .blend files
 pub struct BlenderPlugin;
@@ -144,4 +148,15 @@ async fn load_blend_assets<'a, 'b>(
     // TODO: load other kinds of assets
 
     Ok(())
+}
+
+/// Takes a right handed, z up transformation matrix (Blender) and returns a right handed, y up (Bevy) version of it
+pub fn right_hand_zup_to_right_hand_yup(rhzup: &Mat4) -> Mat4 {
+    let (scale, rotation, translation) = rhzup.to_scale_rotation_translation();
+
+    Mat4::from_scale_rotation_translation(
+        Vec3::new(scale[0], scale[2], scale[1]),
+        rotation,
+        Vec3::new(translation[0], translation[2], -translation[1]),
+    )
 }

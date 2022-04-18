@@ -13,16 +13,19 @@ categories = ["game-development"]
 
 [dependencies]
 blend = ">=0.6.1"
+bevy = "0.7.0"
 bevy_app = "0.7.0"
 bevy_asset = "0.7.0"
+bevy_ecs = "0.7.0"
 bevy_render = "0.7.0"
+bevy_math = "0.7.0"
 bevy_utils = "0.7.0"
 bevy_pbr = "0.7.0"
+bevy_transform = "0.7.0"
 anyhow = ">=1.0"
 thiserror = ">=1.0"
 
 [dev-dependencies]
-bevy = "0.7.0"
 
 [features]
 default = []
