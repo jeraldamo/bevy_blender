@@ -16,7 +16,7 @@ fn main() {
 fn setup(mut commands: Commands, asset_server: ResMut<AssetServer>) {
     commands.spawn_bundle(PbrBundle {
         mesh: asset_server.load(blender_mesh!("demo.blend", "Suzanne")),
-        material: asset_server.load(blender_material!("demo.blend", "Red")),
+        material: asset_server.load(blender_material!("demo.blend", "MetallicRed")),
         transform: Transform::from_translation(Vec3::new(-4.0, 0.0, 0.0)),
         ..Default::default()
     });
@@ -28,7 +28,7 @@ fn setup(mut commands: Commands, asset_server: ResMut<AssetServer>) {
     });
     commands.spawn_bundle(PbrBundle {
         mesh: asset_server.load(blender_mesh!("demo.blend", "Suzanne")),
-        material: asset_server.load(blender_material!("demo.blend", "Blue")),
+        material: asset_server.load(blender_material!("demo.blend", "RoughBlue")),
         transform: Transform::from_translation(Vec3::new(4.0, 0.0, 0.0)),
         ..Default::default()
     });
