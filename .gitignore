@@ -1,3 +1,3 @@
 target/
-
 Cargo.lock
+*.blend[0-9]*
