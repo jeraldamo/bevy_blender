@@ -119,9 +119,6 @@ pub(crate) fn instance_to_mesh(
             }
         }
         (3.., _, _) => {
-            // for vert in &blender_verts {
-            //     normals.push([0.0, 0.0, 1.0]);
-            // }
             normals = calculate_vertex_normals(&blender_faces, &blender_loops, &positions);
         }
     }

@@ -13,14 +13,20 @@ use bevy_render::{
 use bevy_transform::prelude::{GlobalTransform, Transform};
 use blend::{Blend, Instance};
 
-/// A component bundle for Blender Object entities
+/// A component bundle for Blender Object entities modeled after bevy_pbr::MaterialMeshBundle
 #[derive(Bundle)]
 pub struct BlenderObjectBundle {
+    /// Standard mesh
     pub mesh: Handle<Mesh>,
+    /// Standard PBR material to be applied
     pub material: Handle<StandardMaterial>,
+    /// User indication of whether an entity is visibible
     pub visibility: Visibility,
+    /// Algorithmically-computed indication of whether an entity is visible and should be extracted for rendering
     pub computed_visibility: ComputedVisibility,
+    /// Entity's transform relative to its parent's transform
     pub transform: Transform,
+    /// Entity's transform relative to the world origin
     pub global_transform: GlobalTransform,
 }
 

@@ -18,7 +18,7 @@ macro_rules! blender_material {
 /// is a basic material (not nodes based), the bevy_pbr::StandardMaterial will be used.
 pub(crate) fn instance_to_material(
     instance: Instance,
-    blend_version: (u8, u8, u8),
+    _blend_version: (u8, u8, u8),
 ) -> anyhow::Result<StandardMaterial> {
     // Don't process instances of types other than material
     if instance.type_name != "Material" {

@@ -34,7 +34,7 @@
 
 use bevy_app::prelude::*;
 use bevy_asset::{AddAsset, AssetLoader, LoadContext, LoadedAsset};
-use bevy_math::{Mat4, Vec3};
+use bevy_math::{Mat4, Quat, Vec3};
 use bevy_utils::BoxedFuture;
 use blend::Blend;
 
@@ -103,8 +103,7 @@ async fn load_blend_assets<'a, 'b>(
     load_context: &'a mut LoadContext<'b>,
 ) -> anyhow::Result<()> {
     // Check to make sure that the blender file has the magic number
-    //                  B     L     E     N     D     E     R
-    if bytes[0..7] != [0x42, 0x4c, 0x45, 0x4e, 0x44, 0x45, 0x52] {
+    if bytes[0..7] != *b"BLENDER" {
         return Err(anyhow::Error::new(BevyBlenderError::InvalidBlendFile {
             file_name: String::from(load_context.path().to_str().unwrap()),
         }));
@@ -153,10 +152,16 @@ async fn load_blend_assets<'a, 'b>(
 /// Takes a right handed, z up transformation matrix (Blender) and returns a right handed, y up (Bevy) version of it
 pub fn right_hand_zup_to_right_hand_yup(rhzup: &Mat4) -> Mat4 {
     let (scale, rotation, translation) = rhzup.to_scale_rotation_translation();
+    let euler_rotation = rotation.to_euler(bevy_math::EulerRot::XYZ);
 
     Mat4::from_scale_rotation_translation(
         Vec3::new(scale[0], scale[2], scale[1]),
-        rotation,
+        Quat::from_euler(
+            bevy_math::EulerRot::XZY,
+            euler_rotation.0,
+            -euler_rotation.1,
+            euler_rotation.2,
+        ),
         Vec3::new(translation[0], translation[2], -translation[1]),
     )
 }

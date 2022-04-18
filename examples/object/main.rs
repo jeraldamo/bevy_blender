@@ -49,6 +49,7 @@ fn setup(mut commands: Commands, asset_server: ResMut<AssetServer>) {
         )),
     );
 
+    // Light and camera
     commands.spawn_bundle(PointLightBundle {
         transform: Transform::from_translation(Vec3::new(4.0, 8.0, 4.0)),
         ..Default::default()
