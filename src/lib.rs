@@ -29,6 +29,7 @@
 //!     
 //!     // Spawn the Suzanne Blender object with children and its Blender transform
 //!     spawn_blender_object(&mut commands, &asset_server, "demo.blend", "Suzanne", true, None);
+//!        .expect("Error spawning Blender object");
 //!
 //!     // Spawn the Suzanne mesh with the Red material
 //!     commands.spawn_bundle(PbrBundle {
