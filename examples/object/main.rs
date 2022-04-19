@@ -27,10 +27,11 @@ fn setup(mut commands: Commands, asset_server: ResMut<AssetServer>) {
         &mut commands,
         &asset_server,
         "demo.blend",
-        "TransformCube",
+        "TransformCubes",
         true,
         None,
-    );
+    )
+    .expect("Error spawning Blender object");
 
     // Spawn Blender object with children
     // The parent object's transform is provided
@@ -47,7 +48,8 @@ fn setup(mut commands: Commands, asset_server: ResMut<AssetServer>) {
                 Vec3::new(4.0, 0.0, 0.0),
             ),
         )),
-    );
+    )
+    .expect("Error spawning Blender object");
 
     // Light and camera
     commands.spawn_bundle(PointLightBundle {

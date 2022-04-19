@@ -3,15 +3,20 @@
 //!
 //! [bevy_blender](https://github.com/jeraldamo/bevy_blender) is a [Bevy](https://bevyengine.org) library that allows you to use assets created in [Blender](https://blender.org) directly from the .blend file.
 //!
-//! # Usage
+//! ### Usage
 //! 1) Add `bevy_blender` to your `Cargo.toml` dependencies.
 //! 1) Add `bevy_blender::BlenderPlugin` plugin to the bevy `App`
-//! 1) Load Blender mesh assets by using the included macro with `asset_server.load`. For example: `asset_server.load(blender_mesh!("blend_file.blend", "mesh_name"))`
+//! 1) Load Blender assets (see examples)
+//!
+//! ### Supported Assets
+//! * Meshes (using `AssetServer`)
+//! * Basic. not node-based, materials (using `AssetServer`)
+//! * Objects (using `BlenderObjectBundle`)
 //!
 //! *If the asset name in Blender starts with an underscore, it will not be loaded. You can use this to have extra assets in the .blend file that you do not want loaded to the AssetServer.*
 //!
-//! # Example
-//! ```
+//! #### Example
+//! ```rust
 //! fn main() {
 //!     App::build()
 //!         .add_plugin(bevy_blender::BlenderPlugin)
@@ -20,17 +25,22 @@
 //!         .run();
 //! }
 //!
-//! fn setup(commands: &mut Commands, asset_server: Res<AssetServer>, mut materials: ResMut<Assets<StandardMaterial>>) {
+//! fn setup(commands: &mut Commands, asset_server: Res<AssetServer>) {
+//!     
+//!     // Spawn the Suzanne Blender object with children and its Blender transform
+//!     spawn_blender_object(&mut commands, &asset_server, "demo.blend", "Suzanne", true, None);
+//!
+//!     // Spawn the Suzanne mesh with the Red material
 //!     commands.spawn_bundle(PbrBundle {
 //!             mesh: asset_server.load(blender_mesh!("demo.blend", "Suzanne")),
-//!             material: materials.add(Color::rgb(0.9, 0.4, 0.3).into()),
+//!             material: asset_server.load(blender_material!("demo.blend", "Red")),
 //!             ..Default::default()
 //!         })
 //!         // ...
 //! }
 //! ```
 //!
-//! A full example can be found in `examples/demo.rs`. Simply run `cargo run --example demo` to execute it. This will open a .blend file located at `assets/demo.blend`.
+//! A suite of examples can be found in `examples/`. Currently, there are three examples, one that shows how to import just a mesh, one that shows how to import just a material, and one that shows how to import whole objects. Simply run `cargo run --example=object` (or `example=mesh`, or `example=material`) to execute it. This will open a .blend file located at `assets/demo.blend`.
 
 use bevy_app::prelude::*;
 use bevy_asset::{AddAsset, AssetLoader, LoadContext, LoadedAsset};
@@ -57,14 +67,14 @@ impl Plugin for BlenderPlugin {
 #[derive(thiserror::Error, Debug)]
 pub enum BevyBlenderError {
     /// The library tried to parse the .blend file, but could not find the magic number. Probably a corrupted or compressed .blend file.
-    #[error("Invalid .blend file {file_name:?}, missing magic number")]
+    #[error("Invalid .blend file: The file {blend_file:?} does not appear to be a valid Blender file. Please make sure it is not compressed.")]
     InvalidBlendFile {
         /// The name of the .blend file
-        file_name: String,
+        blend_file: String,
     },
 
     /// The library was trying to process a Blend::Instance of one type but got another. Probably an issue with the .blend file.
-    #[error("Invalid instance type (expected {expected:?}, got {found:?})")]
+    #[error("Invalid instance type: Expected {expected:?}, got {found:?}.")]
     InvalidInstanceType {
         /// The type that was expected
         expected: String,
@@ -73,10 +83,19 @@ pub enum BevyBlenderError {
     },
 
     /// The library tried to load a Blender asset that is not yet supported.
-    #[error("Unsupported asset: {asset_type:?}.")]
+    #[error("Unsupported asset: The asset type {asset_type:?} is not currently supported.")]
     UnsupportedAsset {
         /// The type of asset trying to be loaded
         asset_type: String,
+    },
+
+    /// The library tried to access a Blender asset that was not there
+    #[error("Missing asset: The asset {asset_name:?} could not be found in {blend_file:?}. Please make sure the asset name does not start with an underscore.")]
+    MissingAsset {
+        /// The asset name
+        asset_name: String,
+        /// The blender file
+        blend_file: String,
     },
 }
 
@@ -105,7 +124,7 @@ async fn load_blend_assets<'a, 'b>(
     // Check to make sure that the blender file has the magic number
     if bytes[0..7] != *b"BLENDER" {
         return Err(anyhow::Error::new(BevyBlenderError::InvalidBlendFile {
-            file_name: String::from(load_context.path().to_str().unwrap()),
+            blend_file: String::from(load_context.path().to_str().unwrap()),
         }));
     }
 

@@ -45,6 +45,7 @@ impl Default for BlenderObjectBundle {
 
 impl BlenderObjectBundle {
     /// Creates a new BlenderObjectBundle from a .blend file path and an object within it
+    /// It will automatically apply the Blender object's transform and material if applicable
     pub fn new(
         asset_server: &ResMut<AssetServer>,
         blender_file: &str,
@@ -60,14 +61,22 @@ impl BlenderObjectBundle {
     }
 
     /// Creates a new BlenderObjectBundle from a Blend object
+    /// It will automatically apply the Blender object's transform and material if applicable
     pub fn new_from_blend(
         asset_server: &ResMut<AssetServer>,
         blend: &Blend,
         blender_file: &str,
         object_name: &str,
     ) -> anyhow::Result<Self> {
-        let obj = get_object_by_name(blend, format!("OB{}", object_name).as_str())
-            .expect(format!("Object {} does not exist in {}", object_name, blender_file).as_str());
+        let obj = match get_object_by_name(blend, format!("OB{}", object_name).as_str()) {
+            Some(o) => o,
+            None => {
+                return Err(anyhow::Error::new(BevyBlenderError::MissingAsset {
+                    asset_name: object_name.into(),
+                    blend_file: blender_file.into(),
+                }));
+            }
+        };
 
         // Get the first material, if it is not a nodes based material
         // TODO: load all materials instead of just the first
@@ -107,6 +116,8 @@ impl BlenderObjectBundle {
     }
 }
 
+/// Iterates over the objects in the blend file and returns Some(Instance) if object
+/// is present and None otherwise
 fn get_object_by_name<'a>(blend: &'a Blend, name: &str) -> Option<Instance<'a>> {
     for obj in blend.get_by_code(*b"OB") {
         if obj.get("id").get_string("name") == name {
@@ -117,6 +128,7 @@ fn get_object_by_name<'a>(blend: &'a Blend, name: &str) -> Option<Instance<'a>> 
     None
 }
 
+/// Returns a list of all of the children belonging the object in the blend file with the name "name"
 fn get_children<'a>(blend: &'a Blend, name: &str) -> Vec<Instance<'a>> {
     let mut children: Vec<Instance<'a>> = Vec::new();
 
@@ -129,6 +141,8 @@ fn get_children<'a>(blend: &'a Blend, name: &str) -> Vec<Instance<'a>> {
     children
 }
 
+/// Get the world relative 4x4 matrix of an object
+/// This will be in Blender coordinate system (Right Handed, Z-up)
 fn get_world_matrix(object: &Instance) -> Mat4 {
     // world matrix comes in as a flattend row major 4x4 matrix
     let w = object.get_f32_vec("obmat");
@@ -141,10 +155,12 @@ fn get_world_matrix(object: &Instance) -> Mat4 {
     )
 }
 
-/// Creates a BlenderObjectBundle for the object "root_object_name" and spaws it. This object will maintain its Blender transform and
-/// will have its material applied (if it is not nodes-based).
-/// If "spawn_children" is true, then all of the object's children will also be created as BlenderObjectBundles and spawed as children
-/// Of the root object.
+/// Creates a BlenderObjectBundle for the object "root_object_name" and spaws it. This object
+/// will maintain its Blender transform and will have its material applied (if it is not nodes-based).
+/// If "spawn_children" is true, then all of the object's children will also be created as
+/// BlenderObjectBundles and spawed as children of the root object. If parent_transform is Some(t),
+/// then t will be used as it's transform. If parent_transform is None, then the object's Blender transform
+/// will be used (and converted to the Bevy coordinate system).
 pub fn spawn_blender_object(
     commands: &mut Commands,
     asset_server: &ResMut<AssetServer>,
@@ -152,22 +168,24 @@ pub fn spawn_blender_object(
     root_object_name: &str,
     spawn_children: bool,
     parent_transform: Option<Transform>,
-) {
+) -> anyhow::Result<()> {
     // Read blend file, we will pass this along to recurisive calls
     let blend = Blend::from_path(
         std::env::current_dir()
             .unwrap()
-            .join(std::path::PathBuf::from("assets").join(blender_file.clone())),
+            .join(std::path::PathBuf::from("assets").join(blender_file)),
     );
 
     // Get object
-    let obj = get_object_by_name(&blend, format!("OB{}", root_object_name).as_str()).expect(
-        format!(
-            "Object {} does not exist in {}",
-            root_object_name, blender_file
-        )
-        .as_str(),
-    );
+    let obj = match get_object_by_name(&blend, format!("OB{}", root_object_name).as_str()) {
+        Some(o) => o,
+        None => {
+            return Err(anyhow::Error::new(BevyBlenderError::MissingAsset {
+                asset_name: root_object_name.into(),
+                blend_file: blender_file.into(),
+            }));
+        }
+    };
 
     // Get mesh
     let mesh = asset_server.load(
@@ -229,8 +247,11 @@ pub fn spawn_blender_object(
             );
         }
     });
+
+    Ok(())
 }
 
+/// Helper recursive function called by spawn_blender_object to spawn children
 fn spawn_children_objects(
     builder: &mut ChildBuilder,
     asset_server: &ResMut<AssetServer>,
