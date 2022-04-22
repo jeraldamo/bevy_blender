@@ -1,4 +1,5 @@
 #![warn(missing_docs)]
+#![feature(test)]
 //! # bevy_blender
 //!
 //! [bevy_blender](https://github.com/jeraldamo/bevy_blender) is a [Bevy](https://bevyengine.org) library that allows you to use assets created in [Blender](https://blender.org) directly from the .blend file.
@@ -43,7 +44,7 @@
 //!
 //! A suite of examples can be found in `examples/`. Currently, there are three examples, one that shows how to import just a mesh, one that shows how to import just a material, and one that shows how to import whole objects. Simply run `cargo run --example=object` (or `example=mesh`, or `example=material`) to execute it. This will open a .blend file located at `assets/demo.blend`.
 
-use bevy_app::prelude::*;
+use bevy::prelude::*;
 use bevy_asset::{AddAsset, AssetLoader, LoadContext, LoadedAsset};
 use bevy_math::{Mat4, Quat, Vec3};
 use bevy_utils::BoxedFuture;
@@ -129,10 +130,11 @@ async fn load_blend_assets<'a, 'b>(
         }));
     }
 
-    let blend_version = (bytes[9] - 48, bytes[10] - 48, bytes[11] - 48);
+    //let blend_version = (bytes[9] - 48, bytes[10] - 48, bytes[11] - 48);
 
     // TODO: check for compressed blend file and decompress if necessary
     let blend = Blend::new(bytes);
+    let blend_version = get_blend_version(&blend);
 
     // Load mesh assets
     for mesh in blend.get_by_code(*b"ME") {
@@ -146,9 +148,26 @@ async fn load_blend_assets<'a, 'b>(
                 label.as_str(),
                 LoadedAsset::new(mesh::instance_to_mesh(mesh, blend_version)?),
             );
+            info!("Loaded Blender mesh asset: {}", label);
         }
     }
 
+    let unsupported_material: StandardMaterial = StandardMaterial {
+        base_color: Color::rgb(0.9, 0.4, 0.3).into(),
+        reflectance: 0.1,
+        perceptual_roughness: 0.5,
+        ..Default::default()
+    };
+
+    load_context.set_labeled_asset(
+        "bevy_blender_missing_material",
+        LoadedAsset::new(StandardMaterial {
+            base_color: Color::rgb(1.0, 0.0, 0.5),
+            reflectance: 0.0,
+            perceptual_roughness: 0.0,
+            ..Default::default()
+        }),
+    );
     // Load material assets
     for material in blend.get_by_code(*b"MA") {
         // Get the name of the material
@@ -156,11 +175,29 @@ async fn load_blend_assets<'a, 'b>(
 
         // Skip any material whose name starts with underscore
         if !label.starts_with("MA_") {
+            let mat = material::instance_to_material(material, blend_version);
+            if mat.is_ok() {
+                load_context.set_labeled_asset(label.as_str(), LoadedAsset::new(mat.unwrap()));
+                info!("Loaded Blender material asset: {}", label);
+            } else {
+                load_context.set_labeled_asset(
+                    label.as_str(),
+                    LoadedAsset::new(unsupported_material.clone()),
+                );
+                warn!(
+                    "Attempted to load an unsupported Blender material: {}",
+                    label
+                );
+            }
+            // match mat {
+            //     Ok(m) => load_context.set_labeled_asset(label.as_str(), LoadedAsset::new(m)),
+            //     Err(e) => println!("Material {} could not be loaded", label),
+            // };
             // Add the created material with the proper label
-            load_context.set_labeled_asset(
-                label.as_str(),
-                LoadedAsset::new(material::instance_to_material(material, blend_version)?),
-            );
+            // load_context.set_labeled_asset(
+            //     label.as_str(),
+            //     LoadedAsset::new(material::instance_to_material(material, blend_version)?),
+            // );
         }
     }
 
@@ -183,5 +220,16 @@ pub fn right_hand_zup_to_right_hand_yup(rhzup: &Mat4) -> Mat4 {
             euler_rotation.2,
         ),
         Vec3::new(translation[0], translation[2], -translation[1]),
+    )
+}
+
+/// Takes a blend::Blend struct and returns the correct version tuple
+pub fn get_blend_version(blend: &Blend) -> (u8, u8, u8) {
+    let version_raw = blend.blend.header.version;
+
+    (
+        version_raw[0] - 48,
+        version_raw[1] - 48,
+        version_raw[2] - 48,
     )
 }

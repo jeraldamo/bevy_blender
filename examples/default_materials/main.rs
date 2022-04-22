@@ -14,37 +14,34 @@ fn main() {
 }
 
 fn setup(mut commands: Commands, asset_server: ResMut<AssetServer>) {
-    // Create and spawn a Blender object using a BlenderObjectBundle
-    // This will only spawn the one object
-    // This example is included for completeness, but it is recommended to use spawn_blender_object instead
-    let mut suzanne = BlenderObjectBundle::new(&asset_server, "demo.blend", "Suzanne").unwrap();
-    suzanne.transform = Transform::from_translation(Vec3::new(-4.0, 0.0, 0.0));
-    commands.spawn_bundle(suzanne);
-
-    // Spawn Blender object with children
-    // The parent object's transform is taken from Blender
-    spawn_blender_object(
-        &mut commands,
-        &asset_server,
-        "demo.blend",
-        "TransformCube",
-        true,
-        None,
-    );
-
     // Spawn Blender object with children
     // The parent object's transform is provided
     spawn_blender_object(
         &mut commands,
         &asset_server,
         "demo.blend",
-        "Suzanne",
+        "SuzanneNoMat",
         true,
         Some(Transform::from_matrix(
             Mat4::from_scale_rotation_translation(
                 Vec3::new(0.5, 0.5, 0.5),
                 Quat::IDENTITY,
-                Vec3::new(4.0, 0.0, 0.0),
+                Vec3::new(-2.0, 0.0, 0.0),
+            ),
+        )),
+    );
+
+    spawn_blender_object(
+        &mut commands,
+        &asset_server,
+        "demo.blend",
+        "SuzanneNodesMat",
+        true,
+        Some(Transform::from_matrix(
+            Mat4::from_scale_rotation_translation(
+                Vec3::new(0.5, 0.5, 0.5),
+                Quat::IDENTITY,
+                Vec3::new(2.0, 0.0, 0.0),
             ),
         )),
     );

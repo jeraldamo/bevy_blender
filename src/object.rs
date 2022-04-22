@@ -168,6 +168,29 @@ pub fn spawn_blender_object(
     root_object_name: &str,
     spawn_children: bool,
     parent_transform: Option<Transform>,
+) {
+    match spawn_blender_object_with_error(
+        commands,
+        asset_server,
+        blender_file,
+        root_object_name,
+        spawn_children,
+        parent_transform,
+    ) {
+        Ok(_) => {}
+        Err(e) => {
+            error!("{}", e);
+        }
+    }
+}
+
+fn spawn_blender_object_with_error(
+    commands: &mut Commands,
+    asset_server: &ResMut<AssetServer>,
+    blender_file: &str,
+    root_object_name: &str,
+    spawn_children: bool,
+    parent_transform: Option<Transform>,
 ) -> anyhow::Result<()> {
     // Read blend file, we will pass this along to recurisive calls
     let blend = Blend::from_path(
@@ -199,18 +222,17 @@ pub fn spawn_blender_object(
 
     // Get the first material, if it is not a nodes based material
     // TODO: load all materials instead of just the first
-    let mut materials = obj.get("data").get_iter("mat");
-    let material: Handle<StandardMaterial> = match materials.next() {
-        None => Handle::default(),
-        Some(material) => {
-            if (material.get_char("use_nodes") as u8) == 0 {
-                asset_server.load(
-                    format!("{}#{}", blender_file, material.get("id").get_string("name")).as_str(),
-                )
-            } else {
-                Handle::default()
-            }
+    let material: Handle<StandardMaterial> = if obj.get("data").is_valid("mat") {
+        let mut materials = obj.get("data").get_iter("mat");
+        match materials.next() {
+            None => asset_server
+                .load(format!("{}#{}", blender_file, "bevy_blender_missing_material").as_str()),
+            Some(material) => asset_server.load(
+                format!("{}#{}", blender_file, material.get("id").get_string("name")).as_str(),
+            ),
         }
+    } else {
+        asset_server.load(format!("{}#{}", blender_file, "bevy_blender_missing_material").as_str())
     };
 
     // Get the object's transform
@@ -274,16 +296,10 @@ fn spawn_children_objects(
     // TODO: load all materials instead of just the first
     let mut materials = obj.get("data").get_iter("mat");
     let material: Handle<StandardMaterial> = match materials.next() {
-        None => Handle::default(),
-        Some(material) => {
-            if (material.get_char("use_nodes") as u8) == 0 {
-                asset_server.load(
-                    format!("{}#{}", blender_file, material.get("id").get_string("name")).as_str(),
-                )
-            } else {
-                Handle::default()
-            }
-        }
+        None => asset_server
+            .load(format!("{}#{}", blender_file, "bevy_blender_missing_material").as_str()),
+        Some(material) => asset_server
+            .load(format!("{}#{}", blender_file, material.get("id").get_string("name")).as_str()),
     };
 
     // Get the global transform matrix
