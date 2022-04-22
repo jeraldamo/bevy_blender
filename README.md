@@ -32,8 +32,8 @@ bevy_blender makes use of Bevy's asset server. If Bevy detects that you are usin
 
 #### Supported Assets
 * Meshes (using `AssetServer`)
-* Basic, not node-based, materials (using `AssetServer`)
-* Objects (using `BlenderObjectBundle`)
+* Basic, not node-based, materials (using `AssetServer`); if a nodes based material exists, a warning will be given and a default clay-like material will be added to the asset server with the same name.
+* Objects (using `BlenderObjectBundle`); the object's mesh and material will be pulled from the asset server, and if the Blender object did not have a material attached to it, a default pink material will be given.
 
 #### Example
 ```rust
