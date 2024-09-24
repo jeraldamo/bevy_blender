@@ -1,10 +1,12 @@
 use crate::{right_hand_zup_to_right_hand_yup, BevyBlenderError};
-use bevy::prelude::*;
 use bevy_asset::{AssetServer, Handle};
 use bevy_ecs::{
     bundle::Bundle,
     system::{Commands, ResMut},
 };
+use bevy_hierarchy::{BuildChildren, ChildBuilder};
+use bevy_log::error;
+use bevy_math::{Mat4, Vec4};
 use bevy_pbr::prelude::StandardMaterial;
 use bevy_render::{
     mesh::Mesh,

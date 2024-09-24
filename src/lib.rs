@@ -1,5 +1,4 @@
 #![warn(missing_docs)]
-#![feature(test)]
 //! # bevy_blender
 //!
 //! [bevy_blender](https://github.com/jeraldamo/bevy_blender) is a [Bevy](https://bevyengine.org) library that allows you to use assets created in [Blender](https://blender.org) directly from the .blend file.
@@ -44,9 +43,15 @@
 //!
 //! A suite of examples can be found in `examples/`. Currently, there are three examples, one that shows how to import just a mesh, one that shows how to import just a material, and one that shows how to import whole objects. Simply run `cargo run --example=object` (or `example=mesh`, or `example=material`) to execute it. This will open a .blend file located at `assets/demo.blend`.
 
-use bevy::prelude::*;
+// use bevy::prelude::*;
+
+use bevy_app::{App, Plugin};
 use bevy_asset::{AddAsset, AssetLoader, LoadContext, LoadedAsset};
+use bevy_log::{info, warn};
 use bevy_math::{Mat4, Quat, Vec3};
+use bevy_pbr::StandardMaterial;
+use bevy_render::color::Color;
+    
 use bevy_utils::BoxedFuture;
 use blend::Blend;
 
@@ -129,8 +134,6 @@ async fn load_blend_assets<'a, 'b>(
             blend_file: String::from(load_context.path().to_str().unwrap()),
         }));
     }
-
-    //let blend_version = (bytes[9] - 48, bytes[10] - 48, bytes[11] - 48);
 
     // TODO: check for compressed blend file and decompress if necessary
     let blend = Blend::new(bytes);

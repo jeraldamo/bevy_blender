@@ -184,6 +184,7 @@ fn calculate_vertex_normals(
     return normals_out;
 }
 
+#[cfg(nightly)]
 mod tests {
     use super::instance_to_mesh;
     use blend::{Blend, Instance};

@@ -80,7 +80,7 @@ This project is essentially where I want to take it, at least for the near futur
 | bevy_blender Version | Supported Bevy Versions\* | Supported Blender Versions\* |
 |----------------------|---------------------------|------------------------------|
 | 0.1                  | 0.5.x                     | <=2.93                       |
-| 0.2                  | <=0.7.x                   | <=3.1                        |
+| 0.7                  | <=0.7.x                   | <=3.1                        |
 
 \* Versions have not been exhaustively tested and assumptions have been made based off of available documentation. 
 
@@ -105,9 +105,9 @@ Note that the specs of the individual computer you are using will drastically ch
 
 
 ### Change log
-#### v0.2.0 (In progress)
+#### v0.7.0 (In progress)
 * Support for Blender 3+ mesh data was added
 * Support for basic (not nodes based) materials was added
 * Objects can now be loaded directly.
 * ngon polygons are now triangulated using a basic ear clipping algorithm
-* Added mesh import benchmarks
+* Added mesh import benchmarks (must be running Nightly rustc)
