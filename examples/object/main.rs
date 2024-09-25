@@ -19,7 +19,7 @@ fn setup(mut commands: Commands, asset_server: ResMut<AssetServer>) {
     // This example is included for completeness, but it is recommended to use spawn_blender_object instead
     let mut suzanne = BlenderObjectBundle::new(&asset_server, "demo.blend", "Suzanne").unwrap();
     suzanne.transform = Transform::from_translation(Vec3::new(-4.0, 0.0, 0.0));
-    commands.spawn_bundle(suzanne);
+    commands.spawn(suzanne);
 
     // Spawn Blender object with children
     // The parent object's transform is taken from Blender
@@ -50,7 +50,7 @@ fn setup(mut commands: Commands, asset_server: ResMut<AssetServer>) {
     );
 
     // Light and camera
-    commands.spawn_bundle(PointLightBundle {
+    commands.spawn(PointLightBundle {
         transform: Transform::from_translation(Vec3::new(4.0, 8.0, 4.0)),
         ..Default::default()
     });
@@ -59,7 +59,7 @@ fn setup(mut commands: Commands, asset_server: ResMut<AssetServer>) {
     let radius = translation.length();
 
     commands
-        .spawn_bundle(Camera3dBundle {
+        .spawn(Camera3dBundle {
             transform: Transform::from_translation(translation).looking_at(Vec3::ZERO, Vec3::Y),
             ..Default::default()
         })

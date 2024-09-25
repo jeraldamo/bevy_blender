@@ -18,28 +18,28 @@ fn setup(
     asset_server: ResMut<AssetServer>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    commands.spawn_bundle(PbrBundle {
+    commands.spawn(PbrBundle {
         mesh: asset_server.load(blender_mesh!("demo.blend", "Cylinder")),
         material: materials.add(Color::rgb(0.9, 0.4, 0.3).into()),
         transform: Transform::from_translation(Vec3::new(-4.0, 0.0, 0.0)),
         ..Default::default()
     });
 
-    commands.spawn_bundle(PbrBundle {
+    commands.spawn(PbrBundle {
         mesh: asset_server.load(blender_mesh!("demo.blend", "Cube")),
         material: materials.add(Color::rgb(0.9, 0.4, 0.3).into()),
         transform: Transform::from_translation(Vec3::new(0.0, 0.0, 0.0)),
         ..Default::default()
     });
 
-    commands.spawn_bundle(PbrBundle {
+    commands.spawn(PbrBundle {
         mesh: asset_server.load(blender_mesh!("demo.blend", "Suzanne")),
         material: materials.add(Color::rgb(0.9, 0.4, 0.3).into()),
         transform: Transform::from_translation(Vec3::new(4.0, 0.0, 0.0)),
         ..Default::default()
     });
 
-    commands.spawn_bundle(PointLightBundle {
+    commands.spawn(PointLightBundle {
         transform: Transform::from_translation(Vec3::new(4.0, 8.0, 4.0)),
         ..Default::default()
     });
@@ -48,7 +48,7 @@ fn setup(
     let radius = translation.length();
 
     commands
-        .spawn_bundle(Camera3dBundle {
+        .spawn(Camera3dBundle {
             transform: Transform::from_translation(translation).looking_at(Vec3::ZERO, Vec3::Y),
             ..Default::default()
         })
