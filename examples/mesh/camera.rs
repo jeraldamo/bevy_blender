@@ -1,6 +1,5 @@
 use bevy::input::mouse::{MouseMotion, MouseWheel};
 use bevy::prelude::*;
-use bevy::render::camera::PerspectiveProjection;
 
 /// Tags an entity as capable of panning and orbiting.
 #[derive(Component)]
@@ -23,11 +22,11 @@ impl Default for PanOrbitCamera {
 
 /// Pan the camera with middle mouse click, zoom with scroll wheel, orbit with right mouse click.
 pub fn pan_orbit_camera(
-    windows: Res<Windows>,
+    windows: Query<&Window>,
     mut ev_motion: EventReader<MouseMotion>,
     mut ev_scroll: EventReader<MouseWheel>,
     input_mouse: Res<Input<MouseButton>>,
-    mut query: Query<(&mut PanOrbitCamera, &mut Transform, &PerspectiveProjection)>,
+    mut query: Query<(&mut PanOrbitCamera, &mut Transform, &Projection)>,
 ) {
     // change input mapping for orbit and panning here
     let orbit_button = MouseButton::Left;
@@ -49,6 +48,7 @@ pub fn pan_orbit_camera(
         }
     }
     for ev in ev_scroll.iter() {
+        // TODO handle scroll unit
         scroll += ev.y;
     }
     if input_mouse.just_released(orbit_button) || input_mouse.just_pressed(orbit_button) {
@@ -63,34 +63,37 @@ pub fn pan_orbit_camera(
             pan_orbit.upside_down = up.y <= 0.0;
         }
 
+        let window = windows.single();
+        let primary_window_size = Vec2::new(window.width() as f32, window.height() as f32);
+
         let mut any = false;
         if rotation_move.length_squared() > 0.0 {
             any = true;
-            let window = get_primary_window_size(&windows);
             let delta_x = {
-                let delta = rotation_move.x / window.x * std::f32::consts::PI * 2.0;
+                let delta = rotation_move.x / primary_window_size.x * std::f32::consts::PI * 2.0;
                 if pan_orbit.upside_down {
                     -delta
                 } else {
                     delta
                 }
             };
-            let delta_y = rotation_move.y / window.y * std::f32::consts::PI;
+            let delta_y = rotation_move.y / primary_window_size.y * std::f32::consts::PI;
             let yaw = Quat::from_rotation_y(-delta_x);
             let pitch = Quat::from_rotation_x(-delta_y);
             transform.rotation = yaw * transform.rotation; // rotate around global y axis
             transform.rotation = transform.rotation * pitch; // rotate around local x axis
         } else if pan.length_squared() > 0.0 {
-            any = true;
-            // make panning distance independent of resolution and FOV,
-            let window = get_primary_window_size(&windows);
-            pan *= Vec2::new(projection.fov * projection.aspect_ratio, projection.fov) / window;
-            // translate by local axes
-            let right = transform.rotation * Vec3::X * -pan.x;
-            let up = transform.rotation * Vec3::Y * pan.y;
-            // make panning proportional to distance away from focus point
-            let translation = (right + up) * pan_orbit.radius;
-            pan_orbit.focus += translation;
+            if let Projection::Perspective(perspective_projection) = projection {
+                any = true;
+                // make panning distance independent of resolution and FOV,
+                pan *= Vec2::new(perspective_projection.fov * perspective_projection.aspect_ratio, perspective_projection.fov) / primary_window_size;
+                // translate by local axes
+                let right = transform.rotation * Vec3::X * -pan.x;
+                let up = transform.rotation * Vec3::Y * pan.y;
+                // make panning proportional to distance away from focus point
+                let translation = (right + up) * pan_orbit.radius;
+                pan_orbit.focus += translation;
+            }
         } else if scroll.abs() > 0.0 {
             any = true;
             pan_orbit.radius -= scroll * pan_orbit.radius * 0.2;
@@ -109,8 +112,3 @@ pub fn pan_orbit_camera(
     }
 }
 
-fn get_primary_window_size(windows: &Res<Windows>) -> Vec2 {
-    let window = windows.get_primary().unwrap();
-    let window = Vec2::new(window.width() as f32, window.height() as f32);
-    window
-}
