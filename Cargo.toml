@@ -1,7 +1,7 @@
 [package]
 name = "bevy_blender"
 authors = ["Jerald Thomas <jeraldamo@gmail.com>"]
-version = "0.8.0"
+version = "0.9.0"
 edition = "2021"
 description = "bevy_blender is a Bevy library that allows you to use assets created in Blender directly from the .blend file"
 readme = "README.md"
