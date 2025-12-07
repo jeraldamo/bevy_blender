@@ -26,7 +26,7 @@
 //! }
 //!
 //! fn setup(commands: &mut Commands, asset_server: Res<AssetServer>) {
-//!     
+//!
 //!     // Spawn the Suzanne Blender object with children and its Blender transform
 //!     spawn_blender_object(&mut commands, &asset_server, "demo.blend", "Suzanne", true, None);
 //!        .expect("Error spawning Blender object");
@@ -43,16 +43,16 @@
 //!
 //! A suite of examples can be found in `examples/`. Currently, there are three examples, one that shows how to import just a mesh, one that shows how to import just a material, and one that shows how to import whole objects. Simply run `cargo run --example=object` (or `example=mesh`, or `example=material`) to execute it. This will open a .blend file located at `assets/demo.blend`.
 
-// use bevy::prelude::*;
+use std::{io, result::Result};
 
-use bevy_app::{App, Plugin};
-use bevy_asset::{AddAsset, AssetLoader, LoadContext, LoadedAsset};
-use bevy_log::{info, warn};
-use bevy_math::{Mat4, Quat, Vec3};
-use bevy_pbr::StandardMaterial;
-use bevy_render::color::Color;
-    
-use bevy_utils::BoxedFuture;
+use bevy::{
+    app::{App, Plugin},
+    asset::{AssetApp as _, AssetLoader, LoadContext, LoadedAsset},
+    color::Color,
+    log::{info, warn},
+    math::{EulerRot, Mat4, Quat, Vec3},
+    pbr::StandardMaterial,
+};
 use blend::Blend;
 
 mod material;
@@ -96,7 +96,7 @@ pub enum BevyBlenderError {
         asset_type: String,
     },
 
-    /// The library tried to access a Blender asset that was not there
+    /// The library tried to access a Blender asset that was not there.
     #[error("Missing asset: The asset {asset_name:?} could not be found in {blend_file:?}. Please make sure the asset name does not start with an underscore.")]
     MissingAsset {
         /// The asset name
@@ -104,75 +104,98 @@ pub enum BevyBlenderError {
         /// The blender file
         blend_file: String,
     },
+
+    /// The file that the library tried to load caused an io error.
+    #[error("{io_error:?}")]
+    IoError {
+        /// The i/o error
+        io_error: io::Error,
+    },
+
+}
+
+impl From<io::Error> for BevyBlenderError {
+    fn from(value: io::Error) -> Self {
+        Self::IoError { io_error: value }
+    }
 }
 
 #[derive(Default)]
 struct BlenderLoader;
 
 impl AssetLoader for BlenderLoader {
-    fn load<'a>(
-        &'a self,
-        bytes: &'a [u8],
-        load_context: &'a mut LoadContext,
-    ) -> BoxedFuture<'a, anyhow::Result<()>> {
-        Box::pin(async move { Ok(load_blend_assets(bytes, load_context).await?) })
+    type Asset = ();
+    type Settings = ();
+    type Error = BevyBlenderError;
+
+    async fn load(
+        &self,
+        reader: &mut dyn bevy::asset::io::Reader,
+        _: &Self::Settings,
+        load_context: &mut bevy::asset::LoadContext<'_>,
+    ) -> anyhow::Result<Self::Asset, Self::Error> {
+        let mut bytes = Vec::new();
+        reader.read_to_end(&mut bytes).await?;
+        load_blend_assets(&bytes, load_context).await?;
+        Ok(())
     }
 
     fn extensions(&self) -> &[&str] {
         static EXTENSIONS: &[&str] = &["blend"];
         EXTENSIONS
     }
+
 }
 
 async fn load_blend_assets<'a, 'b>(
     bytes: &'a [u8],
     load_context: &'a mut LoadContext<'b>,
-) -> anyhow::Result<()> {
+) -> Result<(), BevyBlenderError> {
     // Check to make sure that the blender file has the magic number
     if bytes[0..7] != *b"BLENDER" {
-        return Err(anyhow::Error::new(BevyBlenderError::InvalidBlendFile {
+        return Err(BevyBlenderError::InvalidBlendFile {
             blend_file: String::from(load_context.path().to_str().unwrap()),
-        }));
+        });
     }
 
     // TODO: check for compressed blend file and decompress if necessary
-    let blend = Blend::new(bytes);
+    let blend = Blend::new(bytes).expect("loading failed");
     let blend_version = get_blend_version(&blend);
 
     // Load mesh assets
-    for mesh in blend.get_by_code(*b"ME") {
+    for mesh in blend.instances_with_code(*b"ME") {
         // Get the name of the mesh and remove the prepending "ME"
         let label = mesh.get("id").get_string("name");
 
         // Skip any mesh whose name starts with underscore
         if !label.starts_with("ME_") {
             // Add the created mesh with the proper label
-            load_context.set_labeled_asset(
-                label.as_str(),
-                LoadedAsset::new(mesh::instance_to_mesh(mesh, blend_version)?),
+            load_context.add_loaded_labeled_asset(
+                label.clone(),
+                LoadedAsset::new_with_dependencies(mesh::instance_to_mesh(mesh, blend_version)?),
             );
             info!("Loaded Blender mesh asset: {}", label);
         }
     }
 
     let unsupported_material: StandardMaterial = StandardMaterial {
-        base_color: Color::rgb(0.9, 0.4, 0.3).into(),
+        base_color: Color::linear_rgb(0.9, 0.4, 0.3).into(),
         reflectance: 0.1,
         perceptual_roughness: 0.5,
         ..Default::default()
     };
 
-    load_context.set_labeled_asset(
+    load_context.add_loaded_labeled_asset(
         "bevy_blender_missing_material",
-        LoadedAsset::new(StandardMaterial {
-            base_color: Color::rgb(1.0, 0.0, 0.5),
+        LoadedAsset::new_with_dependencies(StandardMaterial {
+            base_color: Color::linear_rgb(1.0, 0.0, 0.5),
             reflectance: 0.0,
             perceptual_roughness: 0.0,
             ..Default::default()
         }),
     );
     // Load material assets
-    for material in blend.get_by_code(*b"MA") {
+    for material in blend.instances_with_code(*b"MA") {
         // Get the name of the material
         let label = material.get("id").get_string("name");
 
@@ -180,12 +203,12 @@ async fn load_blend_assets<'a, 'b>(
         if !label.starts_with("MA_") {
             let mat = material::instance_to_material(material, blend_version);
             if mat.is_ok() {
-                load_context.set_labeled_asset(label.as_str(), LoadedAsset::new(mat.unwrap()));
+                load_context.add_loaded_labeled_asset(label.clone(), LoadedAsset::new_with_dependencies(mat.unwrap()));
                 info!("Loaded Blender material asset: {}", label);
             } else {
-                load_context.set_labeled_asset(
-                    label.as_str(),
-                    LoadedAsset::new(unsupported_material.clone()),
+                load_context.add_loaded_labeled_asset(
+                    label.clone(),
+                    LoadedAsset::new_with_dependencies(unsupported_material.clone()),
                 );
                 warn!(
                     "Attempted to load an unsupported Blender material: {}",
@@ -212,12 +235,12 @@ async fn load_blend_assets<'a, 'b>(
 /// Takes a right handed, z up transformation matrix (Blender) and returns a right handed, y up (Bevy) version of it
 pub fn right_hand_zup_to_right_hand_yup(rhzup: &Mat4) -> Mat4 {
     let (scale, rotation, translation) = rhzup.to_scale_rotation_translation();
-    let euler_rotation = rotation.to_euler(bevy_math::EulerRot::XYZ);
+    let euler_rotation = rotation.to_euler(EulerRot::XYZ);
 
     Mat4::from_scale_rotation_translation(
         Vec3::new(scale[0], scale[2], scale[1]),
         Quat::from_euler(
-            bevy_math::EulerRot::XZY,
+            EulerRot::XZY,
             euler_rotation.0,
             -euler_rotation.1,
             euler_rotation.2,
@@ -228,11 +251,10 @@ pub fn right_hand_zup_to_right_hand_yup(rhzup: &Mat4) -> Mat4 {
 
 /// Takes a blend::Blend struct and returns the correct version tuple
 pub fn get_blend_version(blend: &Blend) -> (u8, u8, u8) {
-    let version_raw = blend.blend.header.version;
-
+    let [a, b, c] = blend.blend.header.version;
     (
-        version_raw[0] - 48,
-        version_raw[1] - 48,
-        version_raw[2] - 48,
+        a - 48,
+        b - 48,
+        c - 48,
     )
 }

@@ -1,31 +1,25 @@
 use crate::{right_hand_zup_to_right_hand_yup, BevyBlenderError};
-use bevy_asset::{AssetServer, Handle};
-use bevy_ecs::{
-    bundle::Bundle,
-    system::{Commands, ResMut},
+use bevy::{
+    asset::{AssetServer, Handle},
+    camera::visibility::Visibility,
+    ecs::{bundle::Bundle, system::{Commands, ResMut}},
+    log::error,
+    math::{Mat4, Vec4},
+    mesh::Mesh3d,
+    pbr::{MeshMaterial3d, StandardMaterial},
+    transform::components::{GlobalTransform, Transform}
 };
-use bevy_hierarchy::{BuildChildren, ChildBuilder};
-use bevy_log::error;
-use bevy_math::{Mat4, Vec4};
-use bevy_pbr::prelude::StandardMaterial;
-use bevy_render::{
-    mesh::Mesh,
-    prelude::{ComputedVisibility, Visibility},
-};
-use bevy_transform::prelude::{GlobalTransform, Transform};
 use blend::{Blend, Instance};
 
 /// A component bundle for Blender Object entities modeled after bevy_pbr::MaterialMeshBundle
 #[derive(Bundle)]
 pub struct BlenderObjectBundle {
     /// Standard mesh
-    pub mesh: Handle<Mesh>,
+    pub mesh: Mesh3d,
     /// Standard PBR material to be applied
-    pub material: Handle<StandardMaterial>,
+    pub material: MeshMaterial3d<StandardMaterial>,
     /// User indication of whether an entity is visibible
     pub visibility: Visibility,
-    /// Algorithmically-computed indication of whether an entity is visible and should be extracted for rendering
-    pub computed_visibility: ComputedVisibility,
     /// Entity's transform relative to its parent's transform
     pub transform: Transform,
     /// Entity's transform relative to the world origin
@@ -37,7 +31,6 @@ impl Default for BlenderObjectBundle {
         Self {
             mesh: Default::default(),
             visibility: Default::default(),
-            computed_visibility: Default::default(),
             material: Default::default(),
             transform: Default::default(),
             global_transform: Default::default(),
@@ -57,7 +50,7 @@ impl BlenderObjectBundle {
             std::env::current_dir()
                 .unwrap()
                 .join(std::path::PathBuf::from("assets").join(blender_file)),
-        );
+        ).expect("loading failed");
 
         Self::new_from_blend(asset_server, &blend, blender_file, object_name)
     }
@@ -89,7 +82,6 @@ impl BlenderObjectBundle {
                 if (material.get_char("use_nodes") as u8) == 0 {
                     asset_server.load(
                         format!("{}#{}", blender_file, material.get("id").get_string("name"))
-                            .as_str(),
                     )
                 } else {
                     Handle::default()
@@ -103,15 +95,14 @@ impl BlenderObjectBundle {
         let transform = Transform::from_matrix(corrected_matrix);
 
         return Ok(Self {
-            mesh: asset_server.load(
+            mesh: Mesh3d(asset_server.load(
                 format!(
                     "{}#{}",
                     blender_file,
                     obj.get("data").get("id").get_string("name")
-                )
-                .as_str(),
-            ),
-            material,
+                ),
+            )),
+            material: MeshMaterial3d(material),
             transform,
             ..Default::default()
         });
@@ -121,7 +112,7 @@ impl BlenderObjectBundle {
 /// Iterates over the objects in the blend file and returns Some(Instance) if object
 /// is present and None otherwise
 fn get_object_by_name<'a>(blend: &'a Blend, name: &str) -> Option<Instance<'a>> {
-    for obj in blend.get_by_code(*b"OB") {
+    for obj in blend.instances_with_code(*b"OB") {
         if obj.get("id").get_string("name") == name {
             return Some(obj);
         }
@@ -134,7 +125,7 @@ fn get_object_by_name<'a>(blend: &'a Blend, name: &str) -> Option<Instance<'a>> 
 fn get_children<'a>(blend: &'a Blend, name: &str) -> Vec<Instance<'a>> {
     let mut children: Vec<Instance<'a>> = Vec::new();
 
-    for obj in blend.get_by_code(*b"OB") {
+    for obj in blend.instances_with_code(*b"OB") {
         if obj.is_valid("parent") && obj.get("parent").get("id").get_string("name") == name {
             children.push(obj);
         }
@@ -199,7 +190,7 @@ fn spawn_blender_object_with_error(
         std::env::current_dir()
             .unwrap()
             .join(std::path::PathBuf::from("assets").join(blender_file)),
-    );
+    ).expect("loading failed");
 
     // Get object
     let obj = match get_object_by_name(&blend, format!("OB{}", root_object_name).as_str()) {
@@ -218,8 +209,7 @@ fn spawn_blender_object_with_error(
             "{}#{}",
             blender_file,
             obj.get("data").get("id").get_string("name")
-        )
-        .as_str(),
+        ),
     );
 
     // Get the first material, if it is not a nodes based material
@@ -228,13 +218,13 @@ fn spawn_blender_object_with_error(
         let mut materials = obj.get("data").get_iter("mat");
         match materials.next() {
             None => asset_server
-                .load(format!("{}#{}", blender_file, "bevy_blender_missing_material").as_str()),
+                .load(format!("{}#{}", blender_file, "bevy_blender_missing_material")),
             Some(material) => asset_server.load(
-                format!("{}#{}", blender_file, material.get("id").get_string("name")).as_str(),
+                format!("{}#{}", blender_file, material.get("id").get_string("name")),
             ),
         }
     } else {
-        asset_server.load(format!("{}#{}", blender_file, "bevy_blender_missing_material").as_str())
+        asset_server.load(format!("{}#{}", blender_file, "bevy_blender_missing_material"))
     };
 
     // Get the object's transform
@@ -249,8 +239,8 @@ fn spawn_blender_object_with_error(
 
     // Create BlenderObjectBundle
     let bundle = BlenderObjectBundle {
-        mesh,
-        material,
+        mesh: Mesh3d(mesh),
+        material: MeshMaterial3d(material),
         transform,
         ..Default::default()
     };
@@ -262,7 +252,7 @@ fn spawn_blender_object_with_error(
         }
         for child in get_children(&blend, format!("OB{}", root_object_name).as_str()) {
             spawn_children_objects(
-                parent,
+                parent.commands_mut(),
                 asset_server,
                 &blend,
                 blender_file,
@@ -277,7 +267,7 @@ fn spawn_blender_object_with_error(
 
 /// Helper recursive function called by spawn_blender_object to spawn children
 fn spawn_children_objects(
-    builder: &mut ChildBuilder,
+    builder: &mut Commands,
     asset_server: &ResMut<AssetServer>,
     blend: &Blend,
     blender_file: &str,
@@ -291,7 +281,6 @@ fn spawn_children_objects(
             blender_file,
             obj.get("data").get("id").get_string("name")
         )
-        .as_str(),
     );
 
     // Get the first material, if it is not a nodes based material
@@ -299,9 +288,9 @@ fn spawn_children_objects(
     let mut materials = obj.get("data").get_iter("mat");
     let material: Handle<StandardMaterial> = match materials.next() {
         None => asset_server
-            .load(format!("{}#{}", blender_file, "bevy_blender_missing_material").as_str()),
+            .load(format!("{}#{}", blender_file, "bevy_blender_missing_material")),
         Some(material) => asset_server
-            .load(format!("{}#{}", blender_file, material.get("id").get_string("name")).as_str()),
+            .load(format!("{}#{}", blender_file, material.get("id").get_string("name"))),
     };
 
     // Get the global transform matrix
@@ -314,8 +303,8 @@ fn spawn_children_objects(
 
     // Create BlenderObjectBundle
     let bundle = BlenderObjectBundle {
-        mesh,
-        material,
+        mesh: Mesh3d(mesh),
+        material: MeshMaterial3d(material),
         transform,
         ..Default::default()
     };
@@ -324,7 +313,7 @@ fn spawn_children_objects(
     builder.spawn(bundle).with_children(|parent| {
         for child in get_children(&blend, obj.get("id").get_string("name").as_str()) {
             spawn_children_objects(
-                parent,
+                parent.commands_mut(),
                 asset_server,
                 &blend,
                 blender_file,

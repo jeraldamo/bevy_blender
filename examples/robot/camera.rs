@@ -1,5 +1,6 @@
 use bevy::input::mouse::{MouseMotion, MouseWheel};
 use bevy::prelude::*;
+use bevy::window::PrimaryWindow;
 
 /// Tags an entity as capable of panning and orbiting.
 #[derive(Component)]
@@ -22,10 +23,10 @@ impl Default for PanOrbitCamera {
 
 /// Pan the camera with middle mouse click, zoom with scroll wheel, orbit with right mouse click.
 pub fn pan_orbit_camera(
-    windows: Query<&Window>,
-    mut ev_motion: EventReader<MouseMotion>,
-    mut ev_scroll: EventReader<MouseWheel>,
-    input_mouse: Res<Input<MouseButton>>,
+    window: Single<&Window, With<PrimaryWindow>>,
+    mut ev_motion: MessageReader<MouseMotion>,
+    mut ev_scroll: MessageReader<MouseWheel>,
+    input_mouse: Res<ButtonInput<MouseButton>>,
     mut query: Query<(&mut PanOrbitCamera, &mut Transform, &Projection)>,
 ) {
     // change input mapping for orbit and panning here
@@ -38,16 +39,16 @@ pub fn pan_orbit_camera(
     let mut orbit_button_changed = false;
 
     if input_mouse.pressed(orbit_button) {
-        for ev in ev_motion.iter() {
+        for ev in ev_motion.read() {
             rotation_move += ev.delta;
         }
     } else if input_mouse.pressed(pan_button) {
         // Pan only if we're not rotating at the moment
-        for ev in ev_motion.iter() {
+        for ev in ev_motion.read() {
             pan += ev.delta;
         }
     }
-    for ev in ev_scroll.iter() {
+    for ev in ev_scroll.read() {
         // TODO handle scroll unit
         scroll += ev.y;
     }
@@ -63,7 +64,6 @@ pub fn pan_orbit_camera(
             pan_orbit.upside_down = up.y <= 0.0;
         }
 
-        let window = windows.single();
         let primary_window_size = Vec2::new(window.width() as f32, window.height() as f32);
 
         let mut any = false;

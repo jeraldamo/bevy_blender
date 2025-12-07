@@ -1,8 +1,4 @@
-use bevy_math::Vec3;
-use bevy_render::{
-    mesh::{Indices, Mesh},
-    render_resource::PrimitiveTopology,
-};
+use bevy::{asset::RenderAssetUsages, math::Vec3, mesh::{Indices, Mesh, PrimitiveTopology}};
 use blend::runtime::Instance;
 
 use crate::BevyBlenderError;
@@ -13,7 +9,7 @@ use crate::BevyBlenderError;
 #[macro_export]
 macro_rules! blender_mesh {
     ($blend_file:literal, $mesh_name:literal) => {
-        format!("{}#ME{}", $blend_file, $mesh_name).as_str()
+        format!("{}#ME{}", $blend_file, $mesh_name)
     };
 }
 
@@ -21,13 +17,13 @@ macro_rules! blender_mesh {
 pub(crate) fn instance_to_mesh(
     instance: Instance,
     blend_version: (u8, u8, u8),
-) -> anyhow::Result<Mesh> {
+) -> Result<Mesh, BevyBlenderError> {
     // Don't process instances of types other than mesh
     if instance.type_name != "Mesh" {
-        return Err(anyhow::Error::new(BevyBlenderError::InvalidInstanceType {
+        return Err(BevyBlenderError::InvalidInstanceType {
             expected: String::from("Mesh"),
             found: instance.type_name,
-        }));
+        });
     }
 
     // Takes a normalized i16 vector from instance, and converts it to a normalized f32 vector
@@ -130,11 +126,11 @@ pub(crate) fn instance_to_mesh(
     }
 
     // Create Bevy mesh
-    let mut mesh = Mesh::new(PrimitiveTopology::TriangleList);
-    mesh.set_indices(Some(Indices::U32(indices)));
-    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
+    let mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::all())
+        .with_inserted_indices(Indices::U32(indices))
+        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
 
     // Return Bevy mesh
     Ok(mesh)

@@ -1,5 +1,4 @@
-use bevy_pbr::prelude::StandardMaterial;
-use bevy_render::color::Color;
+use bevy::{color::Color, pbr::StandardMaterial};
 use blend::runtime::Instance;
 
 use crate::BevyBlenderError;
@@ -10,7 +9,7 @@ use crate::BevyBlenderError;
 #[macro_export]
 macro_rules! blender_material {
     ($blend_file:literal, $material_name:literal) => {
-        format!("{}#MA{}", $blend_file, $material_name).as_str()
+        format!("{}#MA{}", $blend_file, $material_name)
     };
 }
 
@@ -32,7 +31,7 @@ pub(crate) fn instance_to_material(
     // material type.
     if (instance.get_char("use_nodes") as u8) == 0 {
         return Ok(StandardMaterial {
-            base_color: Color::rgba(
+            base_color: Color::linear_rgba(
                 instance.get_f32("r"),
                 instance.get_f32("g"),
                 instance.get_f32("b"),
